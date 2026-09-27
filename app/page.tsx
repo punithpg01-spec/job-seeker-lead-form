@@ -1,12 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  function showError(message: string) {
+    setError(message);
+
+    setTimeout(() => {
+      errorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 50);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -18,57 +31,88 @@ export default function Home() {
     const form = event.currentTarget;
     const formData = new FormData(form);
 
-    const fullName = formData.get("full_name")?.toString().trim();
-    const email = formData.get("email")?.toString().trim();
-    const phone = formData.get("phone")?.toString().trim();
-    const targetRole = formData.get("target_role")?.toString().trim();
-    const experience = formData.get("experience")?.toString();
-    const message = formData.get("message")?.toString().trim();
+    const fullName = String(formData.get("full_name") || "").trim();
+    const email = String(formData.get("email") || "").trim();
+    const phone = String(formData.get("phone") || "").trim();
+    const targetRole = String(formData.get("target_role") || "").trim();
+    const experience = String(formData.get("experience") || "").trim();
+    const message = String(formData.get("message") || "").trim();
     const consent = formData.get("consent") === "on";
 
     if (!fullName || !email || !phone || !targetRole || !experience) {
-      setError("Please fill in all required fields.");
+      showError("Please fill in all required fields.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[A-Za-z ]+$/.test(fullName)) {
+      showError("Please enter a valid name using letters only.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError("Please enter a valid email address.");
+      setLoading(false);
+      return;
+    }
+
+    const cleanPhone = phone.replace(/[\s-]/g, "");
+
+    if (!/^(\+91)?[0-9]{10}$/.test(cleanPhone)) {
+      showError("Please enter a valid 10-digit phone number.");
+      setLoading(false);
+      return;
+    }
+
+    if (targetRole.length < 2) {
+      showError("Please enter a valid job role.");
       setLoading(false);
       return;
     }
 
     if (!consent) {
-      setError("Please agree to be contacted.");
+      showError("Please agree to be contacted.");
       setLoading(false);
       return;
     }
 
-    const { error: supabaseError } = await supabase
-      .from("leads")
-      .insert({
-        full_name: fullName,
-        email: email,
-        phone: phone,
-        target_role: targetRole,
-        experience: experience,
-        message: message || null,
-        consent: consent,
-      });
+    try {
+      const { error: supabaseError } = await supabase
+        .from("leads")
+        .insert({
+          full_name: fullName,
+          email: email,
+          phone: phone,
+          target_role: targetRole,
+          experience: experience,
+          message: message || null,
+          consent: consent,
+        });
 
       if (supabaseError) {
-        console.error(supabaseError);
-        setError(`Database error: ${supabaseError.message}`);
+        console.error("Supabase error:", supabaseError);
+        showError(`Database error: ${supabaseError.message}`);
         setLoading(false);
         return;
       }
 
-    setSuccess(
-      "Thank you! Your enquiry has been submitted successfully."
-    );
+      setSuccess(
+        "Thank you! Your enquiry has been submitted successfully."
+      );
 
-    form.reset();
+      form.reset();
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      showError("Something went wrong. Please try again.");
+    }
+
     setLoading(false);
   }
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
 
-      {/* Header */}
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <h1 className="text-2xl font-bold">
@@ -76,10 +120,7 @@ export default function Home() {
           </h1>
 
           <nav className="hidden gap-6 md:flex">
-            <a
-              href="#benefits"
-              className="text-gray-600 hover:text-black"
-            >
+            <a href="#benefits" className="text-gray-600 hover:text-black">
               Benefits
             </a>
 
@@ -90,20 +131,15 @@ export default function Home() {
               How It Works
             </a>
 
-            <a
-              href="#contact"
-              className="text-gray-600 hover:text-black"
-            >
+            <a href="#contact" className="text-gray-600 hover:text-black">
               Contact
             </a>
           </nav>
         </div>
       </header>
 
-      {/* Hero */}
       <section className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-20 text-center">
-
           <p className="mb-4 font-semibold text-blue-600">
             JOB SEEKER SUPPORT
           </p>
@@ -123,11 +159,9 @@ export default function Home() {
           >
             Get Started
           </a>
-
         </div>
       </section>
 
-      {/* Benefits */}
       <section id="benefits" className="py-20">
         <div className="mx-auto max-w-6xl px-6">
 
@@ -177,7 +211,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works */}
       <section id="how-it-works" className="bg-white py-20">
         <div className="mx-auto max-w-6xl px-6 text-center">
 
@@ -233,7 +266,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Enquiry Form */}
       <section id="contact" className="py-20">
         <div className="mx-auto max-w-2xl px-6">
 
@@ -249,16 +281,17 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Success message */}
             {success && (
               <div className="mt-6 rounded-lg bg-green-50 p-4 text-green-700">
                 {success}
               </div>
             )}
 
-            {/* Error message */}
             {error && (
-              <div className="mt-6 rounded-lg bg-red-50 p-4 text-red-700">
+              <div
+                ref={errorRef}
+                className="mt-6 rounded-lg bg-red-50 p-4 text-red-700"
+              >
                 {error}
               </div>
             )}
@@ -268,7 +301,6 @@ export default function Home() {
               className="mt-8 space-y-5"
             >
 
-              {/* Full Name */}
               <div>
                 <label className="mb-2 block font-medium">
                   Full Name *
@@ -283,7 +315,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="mb-2 block font-medium">
                   Email *
@@ -298,7 +329,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Phone */}
               <div>
                 <label className="mb-2 block font-medium">
                   Phone Number *
@@ -313,7 +343,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Target Role */}
               <div>
                 <label className="mb-2 block font-medium">
                   Target Job Role *
@@ -328,7 +357,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Experience */}
               <div>
                 <label className="mb-2 block font-medium">
                   Years of Experience *
@@ -352,7 +380,6 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Message */}
               <div>
                 <label className="mb-2 block font-medium">
                   How can we help?
@@ -366,7 +393,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Consent */}
               <label className="flex items-start gap-3 text-sm text-gray-600">
                 <input
                   name="consent"
@@ -380,7 +406,6 @@ export default function Home() {
                 </span>
               </label>
 
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={loading}
@@ -390,12 +415,10 @@ export default function Home() {
               </button>
 
             </form>
-
           </div>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t bg-white py-8 text-center text-sm text-gray-500">
         © 2026 CareerConnect. All rights reserved.
       </footer>
