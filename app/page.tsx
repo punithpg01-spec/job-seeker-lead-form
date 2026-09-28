@@ -116,7 +116,7 @@ export default function Home() {
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <h1 className="text-2xl font-bold">
-            CareerConnect
+            HireMe
           </h1>
 
           <nav className="hidden gap-6 md:flex">
@@ -420,7 +420,7 @@ export default function Home() {
       </section>
 
       <footer className="border-t bg-white py-8 text-center text-sm text-gray-500">
-        © 2026 CareerConnect. All rights reserved.
+        © 2026 HireMe. All rights reserved.
       </footer>
 
     </main>
